@@ -260,17 +260,30 @@ impl<T: ArrowTimestampType> ArrayBatchDecoder for TimestampOffsetArrayDecoder<T>
         let convert_timezone = |ts| {
             // Convert from writer timezone to reader timezone (which we default to UTC)
             // TODO: more efficient way of doing this?
+            eprintln!(
+                "Converting timestamp {} from {} to {} has_same_tz_rules {} ",
+                ts, self.writer_tz, self.reader_tz, self.has_same_tz_rules
+            );
             if self.has_same_tz_rules {
                 return Some(ts);
             }
-            self.writer_tz
+            let result_ts = self
+                .writer_tz
                 .timestamp_nanos(ts)
                 .naive_local()
                 .and_utc()
                 .naive_local()
                 .and_local_timezone(self.reader_tz)
                 .single()
-                .and_then(|dt_in_reader_tz| dt_in_reader_tz.timestamp_nanos_opt())
+                .and_then(|dt_in_reader_tz| dt_in_reader_tz.timestamp_nanos_opt());
+            eprintln!(
+                "Converting timestamp {} from {} to {} result ts {} ",
+                ts,
+                self.writer_tz,
+                self.reader_tz,
+                result_ts.unwrap()
+            );
+            result_ts
         };
         let array = array
             // first try to convert all non-nullable batches to non-nullable batches
