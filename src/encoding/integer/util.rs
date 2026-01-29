@@ -557,15 +557,7 @@ pub fn signed_zigzag_encode<N: VarintSerde + Signed>(value: N) -> N {
 /// we need the encoded number byte size to find this MSB.
 #[inline]
 pub fn signed_msb_decode<N: NInt + Signed>(encoded: N, encoded_byte_size: usize) -> N {
-    // Protect against shift overflow when encoded_byte_size exceeds target type size
-    let target_bit_size = N::BYTE_SIZE * 8;
-    let msb_bit_position = encoded_byte_size * 8 - 1;
-
-    // If the MSB position exceeds the target type's bit size, treat as positive
-    if msb_bit_position >= target_bit_size {
-        return encoded;
-    }
-    let msb_mask = N::one() << msb_bit_position;
+    let msb_mask = N::one() << (encoded_byte_size * 8 - 1);
     let is_positive = (encoded & msb_mask) == N::zero();
     let clean_sign_bit_mask = !msb_mask;
     let encoded = encoded & clean_sign_bit_mask;
