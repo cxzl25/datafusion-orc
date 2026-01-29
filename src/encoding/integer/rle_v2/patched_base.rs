@@ -69,8 +69,12 @@ pub fn read_patched_base<N: NInt, R: Read, S: EncodingSign>(
 
     let patch_list_length = (fourth_byte & 0x1f) as usize;
 
-    let base = N::read_big_endian(reader, base_byte_width)?;
+    // Read base value as i64 directly, since base_byte_width may exceed N::BYTE_SIZE
+    // This matches Java ORC's implementation which always uses long for base values
+    let base = i64::read_big_endian(reader, base_byte_width)?;
     let base = S::decode_signed_msb(base, base_byte_width);
+    // Convert to target type N for later arithmetic
+    let base = N::from_i64(base);
 
     // Get data values
     // TODO: this should read into Vec<i64>
