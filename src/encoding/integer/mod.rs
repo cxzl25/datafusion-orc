@@ -161,17 +161,29 @@ pub trait NInt:
     fn as_i64(self) -> i64;
 
     fn read_big_endian(reader: &mut impl Read, byte_size: usize) -> Result<Self> {
-        debug_assert!(
-            byte_size <= Self::BYTE_SIZE,
-            "byte_size cannot exceed max byte size of self"
-        );
-        let mut buffer = Self::empty_byte_array();
-        // Read into back part of buffer since is big endian.
-        // So if smaller than N::BYTE_SIZE bytes, most significant bytes will be 0.
-        reader
-            .read_exact(&mut buffer.as_mut()[Self::BYTE_SIZE - byte_size..])
-            .context(IoSnafu)?;
-        Ok(Self::from_be_bytes(buffer))
+        // Match Java ORC's bytesToLongBE implementation:
+        // Work with i64 (like Java long) then cast to target type at the end
+        let mut out: i64 = 0;
+        let mut n = byte_size;
+
+        while n > 0 {
+            n -= 1;
+
+            // Read one byte
+            let mut byte_buf = [0u8; 1];
+            reader.read_exact(&mut byte_buf).context(IoSnafu)?;
+            let val = byte_buf[0] as i64;
+
+            // Java ORC equivalent: out |= (val << (n * 8))
+            let shift_amount = n * 8;
+            if shift_amount < 64 {
+                out |= val << shift_amount;
+            }
+            // If shift amount >= 64, ignore the byte (overflow case)
+        }
+
+        // Convert the i64 result to target type (with truncation if needed)
+        Ok(Self::from_i64(out))
     }
 }
 
